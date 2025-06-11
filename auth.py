@@ -52,7 +52,7 @@ def run():
         message = "Invalid choice"
         success = False
 
-    return success, message
+    return success, message, username
 
 if __name__ == "__main__":
     run()
