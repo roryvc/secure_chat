@@ -35,7 +35,7 @@ def login(username, password):
     else:
         return False, "Incorrect password."
 
-if __name__ == "__main__":
+def run():
     print("Welcome! Please select:")
     print("1 - Sign Up")
     print("2 - Login")
@@ -49,9 +49,10 @@ if __name__ == "__main__":
     elif choice == '2':
         success, message = login(username, password)
     else:
-        print("Invalid choice")
-        exit()
+        message = "Invalid choice"
+        success = False
 
-    print(message)
-    if not success:
-        exit()
+    return success, message
+
+if __name__ == "__main__":
+    run()
