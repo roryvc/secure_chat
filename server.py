@@ -7,6 +7,7 @@ PORT = 12345
 
 clients = {} # socket -> username
 user_sockets = {} # username -> socket
+public_keys = {} # username -> public key pem string
 
 def handle_client(conn, addr):
     # Receive username
@@ -23,7 +24,7 @@ def handle_client(conn, addr):
     
     while True:
         try:
-            msg = conn.recv(1024).decode()
+            msg = conn.recv(4096).decode()
             if not msg:
                 break
             print(f"{username} sent: {msg}")
@@ -37,6 +38,9 @@ def handle_client(conn, addr):
     print(f"[-] {username} disconnected from {addr}")
 
 def process_message(connection, message):
+    if message.startswith("@publickey"):
+        get_user_public_key(connection, message)
+        return
     if message.startswith("@"):
         try:
             to_user, message = message[1:].split(":", 1)  # remove '@', then split
@@ -49,6 +53,15 @@ def process_message(connection, message):
             connection.send(b"[!] Invalid private message format.")
     else:
         connection.send(b"[!] Invalid message format... @ someone's username at the start of the message...")
+
+def get_user_public_key(connection, message):
+    if message.startswith("@publickey"):
+        try:
+            public_key = message[11:]
+            public_keys[clients[connection]] = public_key
+            print(public_keys)
+        except:
+            pass
 
 def start_server():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
