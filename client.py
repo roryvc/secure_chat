@@ -1,9 +1,10 @@
 # client.py
 import socket
 import threading
+import time
+import sys
 import auth
 import crypto_utils
-import time
 
 HOST = '127.0.0.1'
 PORT = 12345
@@ -26,7 +27,6 @@ def receive_messages(sock):
 
             elif msg.startswith("[Private]"):
                 # Format: "[Private] sender_username: <hex string>"
-                # print(msg)  # Optional: show raw message for debugging
 
                 try:
                     prefix, content = msg.split("] ", 1)
@@ -35,18 +35,31 @@ def receive_messages(sock):
                     hex_cipher = hex_cipher.strip()
 
                     if sender_username not in symmetric_keys:
+                        # Clear current input line
+                        sys.stdout.write('\r')         # Return cursor to the beginning
+                        sys.stdout.write('\033[K')     # Clear the line
                         print(f"[!] No symmetric key for {sender_username}. Cannot decrypt message.")
+                        print("you: ", end="", flush=True)
                         continue
 
                     encrypted_bytes = bytes.fromhex(hex_cipher)
                     plaintext = crypto_utils.decrypt_with_symmetric_key(encrypted_bytes, symmetric_keys[sender_username])
+                    # Clear current input line
+                    sys.stdout.write('\r')         # Return cursor to the beginning
+                    sys.stdout.write('\033[K')     # Clear the line
                     print(f"{sender_username}: {plaintext}")
+                    print("you: ", end="", flush=True)
 
                 except Exception as e:
+                    # Clear current input line
+                    sys.stdout.write('\r')         # Return cursor to the beginning
+                    sys.stdout.write('\033[K')     # Clear the line
                     print(f"[!] Failed to decrypt private message: {e}")
+                    print("you: ", end="", flush=True)
 
             else:
                 print(msg)
+                print("you: ", end="", flush=True)
 
         except Exception as e:
             print(f"[!] Connection closed or error occurred: {e}")
@@ -145,6 +158,9 @@ def recieve_symmetric_key(msg):
     encrypted_key = bytes.fromhex(parts[2])
     sym_key = crypto_utils.decrypt_with_private_key(encrypted_key, private_key)
     symmetric_keys[from_user] = sym_key
+    # Clear current input line
+    sys.stdout.write('\r')         # Return cursor to the beginning
+    sys.stdout.write('\033[K')     # Clear the line
     print(f"[✓] Received symmetric key from {from_user}")
 
 if __name__ == "__main__":
