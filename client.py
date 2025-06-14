@@ -1,4 +1,9 @@
-# client.py
+"""
+client.py - Secure chat client with asymmetric key exchange and symmetric encryption.
+
+Handles user authentication, key generation and exchange, and encrypted private messaging
+between users over a TCP socket connection to a server.
+"""
 import socket
 import threading
 import time
@@ -8,11 +13,24 @@ import crypto_utils
 
 HOST = '127.0.0.1'
 PORT = 12345
-symmetric_keys = {} # username -> symmetric key
-private_key = None
-pending_public_keys = {}  # username -> PEM string
+symmetric_keys = {} # Maps username -> symmetric AES key
+private_key = None # RSA private key for decrypting received symmetric keys
+pending_public_keys = {}  # Maps username -> PEM encoded public RSA key
 
 def receive_messages(sock):
+    """
+    Continuously receives messages from the server.
+
+    Handles symmetric key exchange, public key responses, and decryption of
+    private messages. Displays incoming messages in the terminal and maintains
+    a clean user prompt.
+
+    Args:
+        sock (socket.socket): The socket object connected to the server.
+
+    Returns:
+        None
+    """
     while True:
         try:
             msg = sock.recv(4096).decode()
@@ -66,6 +84,18 @@ def receive_messages(sock):
             break
 
 def send_messages(sock):
+    """
+    Continuously reads user input and sends encrypted messages to the server.
+
+    Messages must follow the format '@username:message'. Uses a symmetric key
+    (established using RSA key exchange) to encrypt messages before sending.
+    
+    Args:
+        sock (socket.socket): The socket object connected to the server.
+
+    Returns:
+        None
+    """
     authenticate_user(sock)
     generate_public_private_keys(sock)
 
@@ -99,6 +129,17 @@ def send_messages(sock):
             print(f"[!] Error sending message: {e}")
 
 def authenticate_user(sock):
+    """
+    Prompts the user for login credentials using `auth.run()`.
+
+    Sends the authenticated username to the server if successful. Allows 3 attempts.
+
+    Args:
+        sock (socket.socket): The socket object connected to the server.
+
+    Returns:
+        None
+    """
     # Give 3 login attempts
     for i in range(3):
         success, message, username = auth.run()
@@ -108,10 +149,19 @@ def authenticate_user(sock):
             sock.send(f"@username:{username}".encode())
             break
         if not success and i == 2:
-            "Too many failed login attempts... Exiting app..."
+            print("Too many failed login attempts... Exiting app...")
             exit()
 
 def generate_public_private_keys(sock):
+    """
+    Generates a new RSA key pair and sends the public key to the server.
+
+    Args:
+        sock (socket.socket): The socket object connected to the server.
+
+    Returns:
+        None
+    """
     global private_key
     private_key, public_key = crypto_utils.generate_rsa_keys()
     # tell server public key
@@ -119,6 +169,19 @@ def generate_public_private_keys(sock):
     sock.send(f"@publickey:{public_key_pem.decode()}".encode())
 
 def get_symmetric_key(username, sock):
+    """
+    Retrieves or establishes a symmetric key with the given user.
+
+    If the key already exists in `symmetric_keys`, it is returned.
+    Otherwise, initiates a key exchange and returns the new key.
+
+    Args:
+        username (str): The recipient's username.
+        sock (socket.socket): The socket object used for key exchange.
+
+    Returns:
+        bytes: The symmetric AES key if successful, else None.
+    """
     if username in symmetric_keys:
         return symmetric_keys[username]
     
@@ -129,6 +192,21 @@ def get_symmetric_key(username, sock):
 
 
 def create_symmetric_key(username, sock):
+    """
+    Creates a new AES symmetric key for secure communication with the recipient.
+
+    - Requests the recipient's public key from the server.
+    - Encrypts the symmetric key with their public key.
+    - Sends the encrypted key to the recipient via the server.
+    - Returns the raw symmetric key.
+
+    Args:
+        username (str): The recipient's username.
+        sock (socket.socket): The socket object used for sending requests.
+
+    Returns:
+        bytes or None: The generated symmetric key, or None if key exchange failed.
+    """
     # Ask server for recipient's public key
     sock.send(f"@sendpublickey:{username}".encode())
 
@@ -153,9 +231,21 @@ def create_symmetric_key(username, sock):
     return sym_key
 
 def recieve_symmetric_key(msg):
-    parts = msg.split(":", 2)
-    from_user = parts[1]
-    encrypted_key = bytes.fromhex(parts[2])
+    """
+    Receives and decrypts an incoming symmetric key from another user.
+
+    The symmetric key is stored in `symmetric_keys` and will be used
+    for subsequent encrypted communication with that user.
+
+    Args:
+        msg (str): The full message string starting with '@symkey:' and followed by
+                   the sender's username and a hex-encoded encrypted key.
+
+    Returns:
+        None
+    """
+    _, from_user, hex_ecoded_encrypted_key = msg.split(":", 2)
+    encrypted_key = bytes.fromhex(hex_ecoded_encrypted_key)
     sym_key = crypto_utils.decrypt_with_private_key(encrypted_key, private_key)
     symmetric_keys[from_user] = sym_key
     # Clear current input line
@@ -164,6 +254,9 @@ def recieve_symmetric_key(msg):
     print(f"[✓] Received symmetric key from {from_user}")
 
 if __name__ == "__main__":
+    """
+    Initializes the client, connects to the server, and starts send/receive threads.
+    """
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client.connect((HOST, PORT))
 

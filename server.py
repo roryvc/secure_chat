@@ -1,4 +1,10 @@
-# server.py
+"""
+server.py - Secure messaging server.
+
+Handles multiple client connections, public key registration and exchange, 
+symmetric key forwarding, and private messaging using socket communication.
+"""
+
 import socket
 import threading
 
@@ -10,6 +16,16 @@ user_sockets = {} # username -> socket
 public_keys = {} # username -> public key pem string
 
 def handle_client(conn, addr):
+    """
+    Handles communication with a connected client.
+
+    Registers the client's username, listens for incoming messages,
+    and delegates them for processing.
+
+    Args:
+        conn (socket.socket): The client socket connection.
+        addr (tuple): The address of the connected client.
+    """
     # Receive username
     username_msg = conn.recv(1024).decode()
     if not username_msg.startswith("@username:"):
@@ -38,8 +54,21 @@ def handle_client(conn, addr):
     print(f"[-] {username} disconnected from {addr}")
 
 def process_message(connection, message):
+    """
+    Processes a message received from a client.
+
+    Routes the message based on its prefix:
+    - @publickey: Register a public key
+    - @sendpublickey: Respond with a user's public key
+    - @symkey: Forward a symmetric key to another user
+    - @username:message: Forward a private message
+
+    Args:
+        connection (socket.socket): The socket of the sending client.
+        message (str): The message received from the client.
+    """
     if message.startswith("@publickey:"):
-        get_user_public_key(connection, message)
+        register_user_public_key(connection, message)
         return
     
     elif message.startswith("@sendpublickey:"):
@@ -80,7 +109,14 @@ def process_message(connection, message):
     else:
         connection.send(b"[!] Invalid message format... @ someone's username at the start of the message...")
 
-def get_user_public_key(connection, message):
+def register_user_public_key(connection, message):
+    """
+    Registers a client's public key for future exchange.
+
+    Args:
+        connection (socket.socket): The client socket sending the key.
+        message (str): Message containing the public key prefixed with '@publickey:'.
+    """
     if message.startswith("@publickey:"):
         try:
             public_key = message[11:]
@@ -90,6 +126,11 @@ def get_user_public_key(connection, message):
             pass
 
 def start_server():
+    """
+    Starts the server and listens for incoming client connections.
+
+    Creates a new thread for each connected client.
+    """
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind((HOST, PORT))
     server.listen()
