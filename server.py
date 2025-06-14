@@ -38,13 +38,39 @@ def handle_client(conn, addr):
     print(f"[-] {username} disconnected from {addr}")
 
 def process_message(connection, message):
-    if message.startswith("@publickey"):
+    if message.startswith("@publickey:"):
         get_user_public_key(connection, message)
         return
-    if message.startswith("@"):
+    
+    elif message.startswith("@sendpublickey:"):
+        target_user = message[len("@sendpublickey:"):].strip()
+        public_key_pem = public_keys.get(target_user)
+        if public_key_pem:
+            connection.send(f"@publickeyresponse:{target_user}:{public_key_pem}".encode())
+        else:
+            connection.send(f"[!] Public key for {target_user} not found.".encode())
+        return
+    
+    elif message.startswith("@symkey:"):
+        # Forward the symmetric key message to the recipient
+        try:
+            _, to_user, key_hex = message.split(":", 2)
+            to_conn = user_sockets.get(to_user)
+            if to_conn:
+                to_conn.send(f"@symkey:{clients[connection]}:{key_hex}".encode())
+            else:
+                connection.send(b"[!] Recipient not connected.")
+        except ValueError:
+            connection.send(b"[!] Invalid symkey format.")
+    
+    elif message.startswith("@"):
         try:
             to_user, message = message[1:].split(":", 1)  # remove '@', then split
-            to_conn = user_sockets.get(to_user)
+            to_conn = user_sockets.get(to_user.strip())
+            # print(f"[DEBUG] Processing message: {message}")
+            # print(f"[DEBUG] Known users: {list(user_sockets.keys())}")
+            # print(f"[DEBUG] to_user: '{to_user}'")
+            # print(f"[DEBUG] to_conn: {to_conn}")
             if to_conn:
                 to_conn.send(f"[Private] {clients[connection]}: {message}".encode())
             else:
@@ -55,7 +81,7 @@ def process_message(connection, message):
         connection.send(b"[!] Invalid message format... @ someone's username at the start of the message...")
 
 def get_user_public_key(connection, message):
-    if message.startswith("@publickey"):
+    if message.startswith("@publickey:"):
         try:
             public_key = message[11:]
             public_keys[clients[connection]] = public_key
