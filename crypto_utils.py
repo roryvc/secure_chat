@@ -8,6 +8,7 @@ using asymmetric (RSA) and symmetric (AES) cryptography.
 from cryptography.hazmat.primitives.asymmetric import rsa, padding as asym_padding
 from cryptography.hazmat.primitives import serialization, hashes, padding as sym_padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+import hmac
 import os
 
 def generate_rsa_keys():
@@ -144,6 +145,36 @@ def decrypt_with_symmetric_key(encrypted_bytes, symmetric_key):
     plaintext_bytes = unpadder.update(padded_plaintext) + unpadder.finalize()
 
     return plaintext_bytes.decode()
+
+def create_hmac(message_bytes, key):
+    """
+    Creates a SHA-256 HMAC for the given message using the symmetric key.
+
+    Args:
+        message_bytes (bytes): The message to authenticate (usually ciphertext).
+        key (bytes): The symmetric key used for HMAC.
+
+    Returns:
+        bytes: The HMAC digest.
+    """
+    return hmac.new(key, message_bytes, digestmod='sha256').digest()
+
+def verify_hmac(message_bytes, key, received_hmac):
+    """
+    Verifies that the HMAC matches the message and key.
+
+    Args:
+        message_bytes (bytes): The original message.
+        key (bytes): The symmetric key used for HMAC.
+        received_hmac (bytes): The HMAC received along with the message.
+
+    Returns:
+        bool: True if HMAC is valid, False otherwise.
+    """
+    expected = hmac.new(key, message_bytes, digestmod='sha256').digest()
+    print(f"Expected HMAC: {expected.hex()}")
+    print(f"Received HMAC: {received_hmac.hex()}")
+    return hmac.compare_digest(expected, received_hmac)
 
 if __name__ == "__main__":
     # Example use case - test that the functions all work

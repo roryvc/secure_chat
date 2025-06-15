@@ -61,11 +61,19 @@ def receive_messages(sock):
                         continue
 
                     encrypted_bytes = bytes.fromhex(hex_cipher)
-                    plaintext = crypto_utils.decrypt_with_symmetric_key(encrypted_bytes, symmetric_keys[sender_username])
-                    # Clear current input line
-                    sys.stdout.write('\r')         # Return cursor to the beginning
-                    sys.stdout.write('\033[K')     # Clear the line
-                    print(f"{sender_username}: {plaintext}")
+                    # separate mac and encrypted message
+                    encrypted_message = encrypted_bytes[:-32]
+                    received_hmac = encrypted_bytes[-32:]
+                    # verify hmac before decrypting
+                    if not crypto_utils.verify_hmac(encrypted_message, symmetric_keys[sender_username], received_hmac):
+                        print("[!] Message failed integrity check. Possible tampering!")
+                    else:
+                        plaintext = crypto_utils.decrypt_with_symmetric_key(encrypted_message, symmetric_keys[sender_username])
+                        # Clear current input line
+                        sys.stdout.write('\r')         # Return cursor to the beginning
+                        sys.stdout.write('\033[K')     # Clear the line
+                        print(f"{sender_username}: {plaintext}")
+                        print("[✓] No message tampering detected")
                     print("you: ", end="", flush=True)
 
                 except Exception as e:
@@ -117,9 +125,10 @@ def send_messages(sock):
                 print(f"[!] Failed to obtain symmetric key for {to_user}")
                 continue
 
-            # Encrypt message
+            # Encrypt message and sign with hmac
             encrypted_bytes = crypto_utils.encrypt_with_symmetric_key(plaintext, symmetric_key)
-            hex_payload = encrypted_bytes.hex()
+            mac = crypto_utils.create_hmac(encrypted_bytes, symmetric_key)
+            hex_payload = (encrypted_bytes + mac).hex()
 
             # Send to server
             full_message = f"@{to_user}:{hex_payload}"
