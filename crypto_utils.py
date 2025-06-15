@@ -172,8 +172,8 @@ def verify_hmac(message_bytes, key, received_hmac):
         bool: True if HMAC is valid, False otherwise.
     """
     expected = hmac.new(key, message_bytes, digestmod='sha256').digest()
-    print(f"Expected HMAC: {expected.hex()}")
-    print(f"Received HMAC: {received_hmac.hex()}")
+    # print(f"Expected HMAC: {expected.hex()}")
+    # print(f"Received HMAC: {received_hmac.hex()}")
     return hmac.compare_digest(expected, received_hmac)
 
 if __name__ == "__main__":
